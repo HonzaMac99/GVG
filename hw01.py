@@ -87,8 +87,17 @@ if __name__ == "__main__":
 
     # draw all points (in proper color) and errors
     for i in range(u.shape[1]):
-        plt.plot(u[0, i], u[1, i], 'o', color=colors[i]/255, fillstyle='none')  # the i-th point in magenta color
-        plt.plot((u[0, i], u[0, i] + e[0, i]), (u[1, i], u[1, i] + e[1, i]), 'r-')  # the i-th displacement
+        if i == 0:
+            plt.plot(u[0, i], u[1, i], 'o', color=colors[i]/255, fillstyle='none', label='Points')  # the i-th point in magenta color
+            plt.plot((u[0, i], u[0, i] + e[0, i]), (u[1, i], u[1, i] + e[1, i]), 'r-', label='Transf. errs.')  # the i-th displacement
+        else:
+            plt.plot(u[0, i], u[1, i], 'o', color=colors[i]/255, fillstyle='none')  # the i-th point in magenta color
+            plt.plot((u[0, i], u[0, i] + e[0, i]), (u[1, i], u[1, i] + e[1, i]), 'r-')  # the i-th displacement
+
+    plt.title("Points and transfer errors (x100)")
+    plt.xlabel("x [px]")
+    plt.ylabel("y [px]")
+    plt.legend(loc='lower right')
 
     plt.show()
     fig.savefig('01_daliborka_errs.pdf')
