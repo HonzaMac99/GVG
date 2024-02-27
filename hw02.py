@@ -1,10 +1,12 @@
 import numpy as np                # for matrix computation and linear algebra
 import matplotlib.pyplot as plt   # for drawing and image I/O
-from mpl_toolkits.mplot3d import Axes3D
+from mpl_toolkits.mplot3d import Axes3D  # for 3d plotting
 import matplotlib.image as mpimg
 # from PIL import Image
 import scipy.io as sio            # for matlab file format output
 import itertools                  # for generating all combinations
+
+PRINT = False
 
 IX = [86, 77, 83, 7, 20, 45, 63, 74, 26, 38]  # !!!matlab 1-based
 
@@ -31,8 +33,6 @@ def p2e(p):
 
 # compute Q from the 6 u-X correspondences and remove i-th column
 def compute_Q(u, x, i_remove):
-    b = np.zeros((11, 1))
-
     M = np.zeros((12, 12))
     for i in range(6):
         M[i*2, :]   = np.hstack((e2p(x[:, i]).flatten(),             np.zeros(4),  -u[0, i]*e2p(x[:, i]).flatten()))
@@ -41,13 +41,15 @@ def compute_Q(u, x, i_remove):
     # remove one row of M
     M = np.delete(M, i_remove, 0)
 
-    # solve Ax = 0
+    # check for solvability
     assert np.linalg.matrix_rank(M) >= min(M.shape), "Columns of M are not linearly independent."
 
-    U, S, Vt = np.linalg.svd(M)  # Compute the pseudo-inverse of M
+    # solve Mq = 0
+    U, S, Vt = np.linalg.svd(M)
     q = Vt[-1, :]  # last row
 
-    q = q / q[-1]
+    # q normalisation - doesnt seem to have effect here
+    # q = q / q[-1]
 
     # Q = np.vstack((q[:4].T, q[4:8].T, q[8:].T))
     Q = q.reshape(3, 4)
@@ -65,22 +67,23 @@ def estimate_Q(u_all, x_all, ix):
     e_max_best = np.inf
     Q_best = np.zeros((3, 3))
     for inx in iter:
-        ix_sel = ix[np.array(inx)]
+        ix_sel = ix[np.array(inx)]  # corresp. indexes
         u_sel = u_all[:, ix_sel]
         x_sel = x_all[:, ix_sel]
 
         for i in range(12):
             Q = compute_Q(u_sel, x_sel, i)
 
-            u_proj = Q @ e2p(x_all)
-            e = np.power(u_all[0]-u_proj[0], 2) + np.power(u_all[1]-u_proj[1], 2)
-            e_max = np.sqrt(np.max(e))
+            u_proj = p2e(Q @ e2p(x_all))
+            e = np.sqrt(np.power(u_all[0]-u_proj[0], 2) + np.power(u_all[1]-u_proj[1], 2))
+            e_max = np.max(e)
 
             Q_all.append(Q)
             err_max.append(e_max)
 
             if e_max < e_max_best:
-                print("New best e:", e_max)
+                if PRINT:
+                    print("New best e:", e_max)
                 e_max_best = e_max
                 Q_best = Q
                 points_sel = ix_sel
@@ -93,7 +96,7 @@ if __name__ == "__main__":
     img_arr = mpimg.imread("daliborka_01.jpg")
     ux_all = sio.loadmat("daliborka_01-ux.mat")
     u_all, x_all = ux_all['u'], ux_all['x']
-    ix = np.array(IX) - 0  # convert from matlab indexing to python
+    ix = np.array(IX) - 1  # convert from matlab to python indexing
     Q, points_sel, err_max, err_points, Q_all = estimate_Q(ux_all['u'], ux_all['x'], ix)
 
     # # plot the 3d points
@@ -114,10 +117,10 @@ if __name__ == "__main__":
         elif i in points_sel[0:]:
             plt.plot(u_all[0, i], u_all[1, i], 'o', color='y', fillstyle='full')
         elif i == 0:
-            plt.plot(u_all[0, i], u_all[1, i], 'o', color='b', markersize=1, label='Orig. points')
+            plt.plot(u_all[0, i], u_all[1, i], 'o', color='b', markersize=2, label='Orig. points')
             plt.plot(u_proj[0, i], u_proj[1, i], 'o', color='r', fillstyle='none', label='Reprojected')
         else:
-            plt.plot(u_all[0, i], u_all[1, i], 'o', color='b', markersize=1)
+            plt.plot(u_all[0, i], u_all[1, i], 'o', color='b', markersize=2)
         plt.plot(u_proj[0, i], u_proj[1, i], 'o', color='r', fillstyle='none')
 
     plt.title("Original and reprojected points")
@@ -125,11 +128,11 @@ if __name__ == "__main__":
     plt.ylabel("y [px]")
     plt.legend(loc='lower right')
     plt.show()
+    fig.savefig('02_Q_projections.pdf')
 
     # draw all points and their reprj. errors
     plt.imshow(img_arr)
-    # e = 100 * (u_proj - u_all)
-    e = 1 * (u_proj - u_all)
+    e = 100 * (u_proj - u_all)
     for i in range(u_all.shape[1]):
         if i == points_sel[0]:
             plt.plot(u_all[0, i], u_all[1, i], 'bo', color='y', fillstyle='full', label='Used for Q')
@@ -147,21 +150,21 @@ if __name__ == "__main__":
     plt.ylabel("y [px]")
     plt.legend(loc='lower right')
     plt.show()
-    plt.savefig('02_Q_projections_errors.pdf')
+    fig.savefig('02_Q_projections_errors.pdf')
 
     plt.title("Maximal reproj. err. for each tested Q")
-    plt.plot(np.log(np.array(err_max)))
+    plt.plot(np.log10(np.array(err_max)))
     plt.xlabel("selection index")
     plt.ylabel("log10 of max reproj. err. [px]")
     plt.show()
-    plt.savefig('02_Q_maxerr.pdf')
+    fig.savefig('02_Q_maxerr.pdf')
 
     plt.title("All point reproj. errors for the best Q")
     plt.plot(err_points)
     plt.xlabel("point index")
     plt.ylabel("reproj. err. [px]")
     plt.show()
-    plt.savefig('02_Q_pointerr.pdf')
+    fig.savefig('02_Q_pointerr.pdf')
 
 
 
