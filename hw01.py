@@ -5,6 +5,7 @@ import matplotlib.image as mpimg
 import scipy.io as sio            # for matlab file format output
 import itertools                  # for generating all combinations
 
+PRINT = False
 
 u2 = np.array([[ -182.6,  -170.5,  -178.8,  -202.6,    51.5,   -78.0,   106.1],
                [  265.8,   447.0,   486.7,   851.9,   907.1,  1098.7,  1343.6]])
@@ -19,7 +20,6 @@ colors = np.array([[255, 0, 0],
                    [0, 255, 255],
                    [255, 255, 0],
                    [255, 255, 255]])
-
 
 def e2p(u):
     n = u.shape[1]
@@ -60,7 +60,8 @@ def estimate_A(u2, u):
         e_max = np.sqrt(np.max(e))
 
         if e_max < e_max_best:
-            # print("New best e:", e_max)
+            if PRINT:
+                print("New best e:", e_max)
             e_max_best = e_max
             A_best = A
 
@@ -87,8 +88,17 @@ if __name__ == "__main__":
 
     # draw all points (in proper color) and errors
     for i in range(u.shape[1]):
-        plt.plot(u[0, i], u[1, i], 'o', color=colors[i]/255, fillstyle='none')  # the i-th point in magenta color
-        plt.plot((u[0, i], u[0, i] + e[0, i]), (u[1, i], u[1, i] + e[1, i]), 'r-')  # the i-th displacement
+        if i == 0:
+            plt.plot(u[0, i], u[1, i], 'o', color=colors[i]/255, fillstyle='none', label='Points')  # the i-th point in magenta color
+            plt.plot((u[0, i], u[0, i] + e[0, i]), (u[1, i], u[1, i] + e[1, i]), 'r-', label='Transf. errs.')  # the i-th displacement
+        else:
+            plt.plot(u[0, i], u[1, i], 'o', color=colors[i]/255, fillstyle='none')  # the i-th point in magenta color
+            plt.plot((u[0, i], u[0, i] + e[0, i]), (u[1, i], u[1, i] + e[1, i]), 'r-')  # the i-th displacement
+
+    plt.title("Points and transfer errors (100x)")
+    plt.xlabel("x [px]")
+    plt.ylabel("y [px]")
+    plt.legend(loc='lower right')
 
     plt.show()
     fig.savefig('01_daliborka_errs.pdf')
