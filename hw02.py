@@ -166,6 +166,8 @@ if __name__ == "__main__":
     plt.show()
     fig.savefig('02_Q_pointerr.pdf')
 
+    # save the Q for hw03
+    np.save("Q.npy", Q)
 
 
 
