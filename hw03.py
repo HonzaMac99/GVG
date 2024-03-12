@@ -9,8 +9,8 @@ import scipy.io as sio            # for matlab file format output
 import itertools                  # for generating all combinations
 
 
-# b1_len = 5e-6  # [m]
-b1_len = 5e-4  # [m]
+b1_len = 5e-6  # [m]
+# b1_len = 5e-4  # [m]
 
 
 def e2p(u):
@@ -65,7 +65,7 @@ def Q2KRC(Q):
     return [K, R, C]
 
 
-def plot_csystem(ax, Base = np.eye(3), b = np.zeros((3, 1)), color = 'k', name = 'd'):
+def plot_csystem(ax, Base = np.eye(3), b = np.zeros((3, 1)), color = 'k', name = 'd', scale=1):
     n_axes = 3 if (name != 'a') else 2
     multipliers = [1, 1, 1]
     if name in ['a', 'b']:
@@ -73,18 +73,19 @@ def plot_csystem(ax, Base = np.eye(3), b = np.zeros((3, 1)), color = 'k', name =
 
     b = b.reshape(3,)
     for i in range(n_axes):
-        x_crds = [b[0], b[0] + Base[0, i]*multipliers[i]]
-        y_crds = [b[1], b[1] + Base[1, i]*multipliers[i]]
-        z_crds = [b[2], b[2] + Base[2, i]*multipliers[i]]
+        mult = multipliers[i]*scale
+        x_crds = [b[0], b[0] + Base[0, i]*mult]
+        y_crds = [b[1], b[1] + Base[1, i]*mult]
+        z_crds = [b[2], b[2] + Base[2, i]*mult]
         ax.plot(x_crds, y_crds, z_crds, c=color, marker="^")
         ax.text(x_crds[1], y_crds[1], z_crds[1], f"{name}{i+1}", c=color, fontsize=10)
     return
 
 
-def fix_axes(ax, n):
-    ax.set_xlim3d(-n, n)
-    ax.set_ylim3d(-n, n)
-    ax.set_zlim3d(-n, n)
+def fix_axes(ax, n=2.0, c=np.zeros(3)):
+    ax.set_xlim3d(c[0] - n, c[0] + n)
+    ax.set_ylim3d(c[1] - n, c[1] + n)
+    ax.set_zlim3d(c[2] - n, c[2] + n)
     return
 
 
@@ -92,17 +93,19 @@ if __name__ == "__main__":
     ux_all = sio.loadmat("daliborka_01-ux.mat")
     u_all, x_all = ux_all['u'], ux_all['x']
     Q = np.load("Q.npy")
-    Q /= np.linalg.norm(Q[2, :3])
+    lambd = np.linalg.norm(Q[2, :3])
+    Q /= lambd
 
     [K, R, C] = Q2KRC(Q)
     f = K[0, 0] * b1_len
+    # f = K[0, 0] * lambd
 
     # print(f"K = \n{K}")
     # print(f"R = \n{R}")
     # print(f"C = \n{C}")
     # print("-------------------")
     Pb = (1/f) * np.hstack((K@R, -K@R@C))
-    # print(f"Pb = \n{Pb}")
+    print(f"Pb = \n{Pb}")
 
     R_inv = R.T
     K_inv = np.linalg.inv(K)
@@ -144,25 +147,31 @@ if __name__ == "__main__":
     fig = plt.figure(figsize = (8,8))
     ax = plt.axes(projection='3d')
     fix_axes(ax, 2)
-    for i in range(len(bases1)):
+    for i in range(len(bases1)-1):
         ps = params[bases1[i]]
         plot_csystem(ax, ps[0], ps[1], ps[2], ps[3])
-    # TODO: why the img points are 2*times further than the image coords?
-    u_all_delta = (Beta @ e2p(u_all)) + o   # Beta = R_inv * f @ K_inv
+    ps = params["Beta"]
+    plot_csystem(ax, ps[0], ps[1], ps[2], ps[3], 50)
+
+    # Beta = R_inv*f@K_inv
+    u_all_delta = (Beta @ e2p(u_all)) + C
     ax.scatter(u_all_delta[0, :], u_all_delta[1, :], u_all_delta[2, :], marker='o', s=20, c='b')
     plt.show()
 
+
     fig = plt.figure(figsize = (8,8))
     ax = plt.axes(projection='3d')
-    fix_axes(ax, 2)
+    fix_axes(ax, 0.02, C)
     for i in range(len(bases2)):
         ps = params[bases2[i]]
         plot_csystem(ax, ps[0], ps[1], ps[2], ps[3])
-    # TODO: why the img points are 2*times further than the image coords?
-    u_all_delta = (Beta @ e2p(u_all)) + o   # Beta = R_inv * f @ K_inv
+
+    # Beta = R_inv*f@K_inv
+    u_all_delta = (Beta @ e2p(u_all)) + C
     ax.scatter(u_all_delta[0, :], u_all_delta[1, :], u_all_delta[2, :], marker='o', s=20, c='b')
     # ax.scatter(x_all[0, :], x_all[1, :], x_all[2, :], marker='o', s=20, c='r')
     plt.show()
+
 
     fig = plt.figure(figsize = (8, 8))
     ax = plt.axes(projection='3d')
