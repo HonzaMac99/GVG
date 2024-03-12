@@ -31,22 +31,8 @@ def p2e(p):
 
 
 def Q2KRC(Q):
-    K = np.eye(3)
-    R = np.eye(3)
-    C = np.zeros((3, 1))
-
-    # # f = 1 / Q[2, 2]
-    # K[1, 1] = np.sqrt(np.power(Q[1, 0], 2) + np.power(Q[1, 1], 2))
-    # s = Q[1, 0] / K[1, 1]
-    # c = Q[1, 1] / K[1, 1]
-
-    # K[0, 2] = Q[0, 2]
-    # K[1, 2] = Q[1, 2]
-
-    # R[0:2, 0:2] = np.array([[c, -s], [s, c]])
-
-    # # K[0, 0] =
-    # # K[0, 1] =
+    lambd = np.linalg.norm(Q[2, :3])
+    Q /= lambd
 
     K, R = scipy.linalg.rq(Q[:, :3])
 
@@ -93,8 +79,6 @@ if __name__ == "__main__":
     ux_all = sio.loadmat("daliborka_01-ux.mat")
     u_all, x_all = ux_all['u'], ux_all['x']
     Q = np.load("Q.npy")
-    lambd = np.linalg.norm(Q[2, :3])
-    Q /= lambd
 
     [K, R, C] = Q2KRC(Q)
     f = K[0, 0] * b1_len
