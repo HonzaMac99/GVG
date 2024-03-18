@@ -102,7 +102,7 @@ if __name__ == "__main__":
     o = C + b3_delta
 
     Delta,   d = np.eye(3),         O
-    # Kappa,   k = Delta * f,   O
+    Kappa_old,   k_old = Delta * f,   O
     Epsilon, e = Delta @ R_inv,     C
     Gamma,   g = Epsilon * f,       C
     Kappa,   k = Gamma @ R,         O
