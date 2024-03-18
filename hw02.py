@@ -168,6 +168,7 @@ if __name__ == "__main__":
 
     # save the Q for hw03
     np.save("Q.npy", Q)
+    np.save("Q_all.npy", Q_all)
 
 
 
