@@ -113,9 +113,9 @@ if __name__ == "__main__":
     u_sel = u_all[:, points_sel]
     for i in range(u_all.shape[1]):
         if i == points_sel[0]:
-            plt.plot(u_all[0, i], u_all[1, i], 'o', color='y', fillstyle='full', label='Used for Q')
+            plt.plot(u_all[0, i], u_all[1, i], 'o', color='y', fillstyle='full', mec="k", mew=0.5, label='Used for Q')
         elif i in points_sel[0:]:
-            plt.plot(u_all[0, i], u_all[1, i], 'o', color='y', fillstyle='full')
+            plt.plot(u_all[0, i], u_all[1, i], 'o', color='y', fillstyle='full', mec="k", mew=0.5)
         elif i == 0:
             plt.plot(u_all[0, i], u_all[1, i], 'o', color='b', markersize=2, label='Orig. points')
             plt.plot(u_proj[0, i], u_proj[1, i], 'o', color='r', fillstyle='none', label='Reprojected')
@@ -129,15 +129,17 @@ if __name__ == "__main__":
     plt.legend(loc='lower right')
     plt.show()
     fig.savefig('02_Q_projections.pdf')
+    fig = plt.figure()
+
 
     # draw all points and their reprj. errors
     plt.imshow(img_arr)
     e = 100 * (u_proj - u_all)
     for i in range(u_all.shape[1]):
         if i == points_sel[0]:
-            plt.plot(u_all[0, i], u_all[1, i], 'bo', color='y', fillstyle='full', label='Used for Q')
+            plt.plot(u_all[0, i], u_all[1, i], 'bo', color='y', fillstyle='full', mec="k", mew=0.5, label='Used for Q')
         elif i in points_sel[0:]:
-            plt.plot(u_all[0, i], u_all[1, i], 'bo', color='y', fillstyle='full')
+            plt.plot(u_all[0, i], u_all[1, i], 'bo', color='y', fillstyle='full', mec="k", mew=0.5)
         elif i == 0:
             plt.plot(u_all[0, i], u_all[1, i], 'o', color='b', markersize=1, label='Orig. points')
             plt.plot((u_all[0, i], u_all[0, i] + e[0, i]), (u_all[1, i], u_all[1, i] + e[1, i]), 'r-', label='Errors (100x)')
@@ -151,6 +153,7 @@ if __name__ == "__main__":
     plt.legend(loc='lower right')
     plt.show()
     fig.savefig('02_Q_projections_errors.pdf')
+    fig = plt.figure()
 
     plt.title("Maximal reproj. err. for each tested Q")
     plt.plot(np.log10(np.array(err_max)))
@@ -158,6 +161,7 @@ if __name__ == "__main__":
     plt.ylabel("log10 of max reproj. err. [px]")
     plt.show()
     fig.savefig('02_Q_maxerr.pdf')
+    fig = plt.figure()
 
     plt.title("All point reproj. errors for the best Q")
     plt.plot(err_points)
