@@ -9,6 +9,8 @@ import scipy.io as sio            # for matlab file format output
 import itertools                  # for generating all combinations
 
 
+# These coords are in [x, y] format, FLIP IT WHEN INDEXING!!
+
 U0 = np.array([[ 142.4,    93.4,   139.1,   646.9,  1651.4,  1755.2,  1747.3,  1739.5,  1329.2,   972.0],
                [1589.3,   866.7,   259.3,   305.6,    87.3,   624.8,  1093.5,  1593.8,  1610.2,  1579.3]])
 
@@ -17,6 +19,9 @@ U = np.array([[783.8,   462.6,   243.7,   363.9,   465.2,   638.3,   784.7,   95
 
 C = np.array([[474.4,   508.2,   739.3,   737.2],
               [501.7,   347.0,   348.7,   506.7]])
+
+C2 = np.array([[473, 131, 798, 986],
+               [226, 597, 807, 325]])
 
 
 def e2p(u):
@@ -35,6 +40,8 @@ def p2e(p):
 
     return p[:d-1, :] / p[d-1, :]
 
+
+# -------------- Main functions -----------------------------------
 
 def u2H(u, u0):
     A = np.zeros((8, 9))
@@ -61,41 +68,193 @@ def u2h_optim(u, u0):
         u_proj = p2e(H @ e2p(u))
         e = np.max(np.linalg.norm(u0 - u_proj, axis=0))
         if e < e_best:
-            print(e)
             e_best = e
             H_best = H
             points_sel = np.array(inx)
+
     return H_best, points_sel
+
+
+# -------------- Point predicates -----------------------------------
+
+def orient_pred(p1, p2, p3):
+    return (p1[0] - p3[0]) * (p2[1] - p3[1]) - (p2[0] - p3[0]) * (p1[1] - p3[1])
+
+def in_rect(p, C):
+    th = -1000  # add some overlap
+    c1, c2, c3, c4 = np.hsplit(C, 4)
+    b1 = orient_pred(c1, c2, p) >= th
+    b2 = orient_pred(c2, c3, p) >= th
+    b3 = orient_pred(c3, c4, p) >= th
+    b4 = orient_pred(c4, c1, p) >= th
+
+    return b1 and b2 and b3 and b4
+
+
+# -------------- Matching of color intensities using histograms ---------------------------
+# Note: this is not suitable for this task!
+I_lvls = 256
+
+def compute_hist(img, Cs=None):
+    img_hist = np.zeros((I_lvls, 3))
+
+    for i in range(img.shape[0]):
+        for j in range(img.shape[1]):
+            if Cs is None or not in_rect([j, i], Cs[0]): #  and in_quadr([j, i], Cs[1])):
+                intensity = img[i, j]
+                for k in range(3):
+                    img_hist[intensity[k], k] += 1
+
+    return img_hist
+
+def compute_cdf(img, Cs=None):
+    img_hist = compute_hist(img, Cs)
+    img_cdf = np.cumsum(img_hist, axis=0)
+    img_cdf = img_cdf / img_cdf[-1, :]
+    return img_cdf
+
+def match_hists(img, img_target, Cs=None):
+    # get both cdfs
+    cdf_A = compute_cdf(img)
+    cdf_B = compute_cdf(img_target, Cs)
+    print("got cdfs")
+
+    # create histogram matching lookup table
+    matching_lut = np.zeros((I_lvls, 3))
+    for i in range(I_lvls):
+        for k in range(3):
+            j = 0
+            while (j < I_lvls) and (cdf_A[i, k] > cdf_B[j, k]):
+                j += 1
+            matching_lut[i, k] = j
+    print("got matching lut")
+
+    # match the histograms
+    img_matched = img
+    for i in range(img.shape[0]):
+        for j in range(img.shape[1]):
+            intensity = img[i, j]
+            for k in range(3):
+                img_matched[i, j, k] = matching_lut[intensity[k], k]
+
+    print("got matched img")
+    return img_matched
+
+# ---------- using color transformation matrix ------------------------------
+
+def get_color_tf(img1, img2, H, limits):
+    """ Function, finds the color transformation matrix T
+
+    Parameters
+    ----------
+    image1 : np.array (H, W, 3)
+        First image in RGB format
+    image2 : np.array (H, W, 3)
+        Second image in RGB format
+    H : np.array (3, 3)
+        Homography matrix
+    x_min : int
+        Minimum x coordinate of the rectangle
+    x_max : int
+        Maximum x coordinate of the rectangle
+    y_min : int
+        Minimum y coordinate of the rectangle
+    y_max : int
+        Maximum y coordinate of the rectangle
+
+    Returns
+    -------
+    np.array (4, 3)
+        Color transformation matrix
+    """
+
+    [x_min, x_max, y_min, y_max] = limits
+    xs = np.arange(x_min, x_max)
+    ys = np.arange(y_min, y_max)
+
+    patch_ref = np.zeros((len(ys), len(xs), 3), dtype=np.uint8)
+
+    H_inv = np.linalg.inv(H)
+    for j, y in enumerate(ys):
+        for i, x in enumerate(xs):
+            x_new, y_new = p2e(H_inv @ [x, y, 1]).round().astype(int)
+            patch_ref[j, i] = img1[y_new, x_new, :]
+
+    patch_target = img1[y_min:y_max, x_min:x_max, :]
+
+    r = patch_ref[:, :, 0].flatten()
+    g = patch_ref[:, :, 1].flatten()
+    b = patch_ref[:, :, 2].flatten()
+
+    r_target = patch_target[:, :, 0].flatten()
+    g_target = patch_target[:, :, 1].flatten()
+    b_target = patch_target[:, :, 2].flatten()
+
+    ones = np.ones_like(r)
+
+    B = np.c_[r, g, b, ones]
+    A = np.c_[r_target, g_target, b_target]
+    T = np.linalg.lstsq(A, B, rcond=None)[0]
+
+    return T
 
 
 if __name__ == "__main__":
     img1 = mpimg.imread("pokemon_00.jpg")
     img2 = mpimg.imread("pokemon_10.jpg")
+
     H, points_sel = u2h_optim(U, U0)
     points_sel = points_sel + 1  # to matlab indexing
     sio.savemat('05_homography.mat', {'u': U, 'u0': U0, "point_sel": points_sel, "H": H})
 
+    # limits = x_min, x_max, y_min, y_max
+    limits = [550, 800, 550, 700]
+    C_limits = np.array([[550, 550, 800, 800],
+                         [550, 700, 700, 550]])
+    T = get_color_tf(img1, img2, H, limits)
+    print(T)
+
+    try:
+        img3 = np.load("img3.npy")
+    except:
+        print("img3.npy doesn't exist --> creating img3")
+        Cs = [C, C2]
+        img3 = match_hists(img1.copy(), img2, Cs)
+        np.save("img3.npy", img3)
+
+    plt.imshow(img1)
+    plt.show()
+    plt.imshow(img2)
+    plt.show()
+    plt.imshow(img3)
+    plt.show()
+
     H_inv = np.linalg.inv(H)
     for i in range(img2.shape[0]):
         for j in range(img2.shape[1]):
-            if np.sum(img2[i, j, :]) <= 40:
-                px2 = np.array([i, j]).reshape(2, 1)
+            if in_rect([j, i], C):
+                px2 = np.array([j, i]).reshape(2, 1)            # u,x == j, v,y == i
                 px1 = np.round(p2e(H @ e2p(px2))).astype(int)
-                # print(px1[0], px1[1])
-                if 0 <= px1[0] < img1.shape[0] and 0 <= px1[1] < img1.shape[1]:
-                    img2[i, j, :] = img1[px1[0], px1[1], :]
-                    # img1[px1[0], px1[1], :] = [0, 0, 0]
+                if 0 <= px1[1] < img1.shape[0] and 0 <= px1[0] < img1.shape[1]:
+                    # img2[i, j, :] = img1[px1[1], px1[0], :]
+                    color = img3[px1[1], px1[0], :].reshape(3, 1)
+                    img2[i, j, :] = (T @ e2p(color)).flatten()
 
     plt.figure()
     plt.imshow(img2)
     U0_proj = p2e(H_inv @ e2p(U0))
     plt.plot(C[0], C[1], "rx")
+    plt.plot(C_limits[0], C_limits[1], "gx")
     plt.plot(U[0], U[1], "go")
     plt.plot(U0_proj[0], U0_proj[1], "mo")
     plt.show()
 
     plt.imshow(img1)
     U_proj = p2e(H @ e2p(U))
+    C_proj = np.round(p2e(H @ e2p(C))).astype(int)
+    C_limits_proj = np.round(p2e(H @ e2p(C_limits))).astype(int)
+    plt.plot(C_proj[0], C_proj[1], "rx")
+    plt.plot(C_limits_proj[0], C_limits_proj[1], "gx")
     plt.plot(U0[0], U0[1], "go")
     plt.plot(U_proj[0], U_proj[1], "mo")
     plt.show()
