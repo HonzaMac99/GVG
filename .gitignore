@@ -2,6 +2,7 @@
 *.pdf
 *.ply
 *.png
+*.jpg
 *.npy
 *.pickle
 *.mat
