@@ -69,7 +69,7 @@ def estimate_A(u2, u):
 
 
 if __name__ == "__main__":
-    img_arr = mpimg.imread("daliborka_01.jpg")
+    img_arr = mpimg.imread("data/daliborka_01.jpg")
 
     # change the pixel colors
     u_coords = np.round(u).astype(int)

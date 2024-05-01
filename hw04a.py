@@ -204,8 +204,8 @@ if __name__ == "__main__":
 
 
     # --- Task 2 ---
-    K = sio.loadmat("K.mat")["K"]
-    ux_all = sio.loadmat("daliborka_01-ux.mat")
+    K = sio.loadmat("data/K.mat")["K"]
+    ux_all = sio.loadmat("data/daliborka_01-ux.mat")
     u_all, x_all = ux_all['u'], ux_all['x']
 
     ix = np.array([86, 77, 83, 7, 20, 45, 63, 74, 26, 38]) - 1

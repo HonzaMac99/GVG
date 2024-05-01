@@ -175,9 +175,10 @@ def get_color_tf(img1, img2, H, limits):
 
     return T
 
+
 if __name__ == "__main__":
-    img1 = mpimg.imread("pokemon_00.jpg")
-    img2 = mpimg.imread("pokemon_10.jpg")
+    img1 = mpimg.imread("data/pokemon_00.jpg")
+    img2 = mpimg.imread("data/pokemon_10.jpg")
 
     H, points_sel = u2h_optim(U, U0)
     print(points_sel)

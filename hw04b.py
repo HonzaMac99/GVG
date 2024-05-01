@@ -92,9 +92,9 @@ if __name__ == "__main__":
 
     # -----------------------------------------------------
 
-    img_arr = mpimg.imread("daliborka_01.jpg")
-    K = sio.loadmat("K.mat")["K"]
-    ux_all = sio.loadmat("daliborka_01-ux.mat")
+    img_arr = mpimg.imread("data/daliborka_01.jpg")
+    K = sio.loadmat("data/K.mat")["K"]
+    ux_all = sio.loadmat("data/daliborka_01-ux.mat")
     u_all, x_all = ux_all['u'], ux_all['x']
     ix = np.array(IX) - 1  # convert from matlab to python indexing
 

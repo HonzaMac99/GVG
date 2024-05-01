@@ -78,10 +78,10 @@ def fix_axes(ax, n=2.0, c=np.zeros(3)):
 
 
 if __name__ == "__main__":
-    ux_all = sio.loadmat("daliborka_01-ux.mat")
+    ux_all = sio.loadmat("data/daliborka_01-ux.mat")
     u_all, x_all = ux_all['u'], ux_all['x']
-    Q = np.load("Q.npy")
-    Q_all = np.load("Q_all.npy")
+    Q = np.load("data/Q.npy")
+    Q_all = np.load("data/Q_all.npy")
 
     K, R, C = Q2KRC(Q)
     f = K[0, 0] * b1_len

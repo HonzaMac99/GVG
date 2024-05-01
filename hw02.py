@@ -93,8 +93,8 @@ def estimate_Q(u_all, x_all, ix):
 
 
 if __name__ == "__main__":
-    img_arr = mpimg.imread("daliborka_01.jpg")
-    ux_all = sio.loadmat("daliborka_01-ux.mat")
+    img_arr = mpimg.imread("data/daliborka_01.jpg")
+    ux_all = sio.loadmat("data/daliborka_01-ux.mat")
     u_all, x_all = ux_all['u'], ux_all['x']
     ix = np.array(IX) - 1  # convert from matlab to python indexing
     Q, points_sel, err_max, err_points, Q_all = estimate_Q(ux_all['u'], ux_all['x'], ix)
