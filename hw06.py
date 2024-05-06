@@ -29,8 +29,8 @@ def p2e(p):
 
 
 if __name__ == "__main__":
-    # mistakes: took the width, height values from cw and didn't check
-    #           though u2h_optim produces H_ij, but produced H_ji
+    # mistakes: took the width and height values from courseware and didn't check (line 40)
+    #           though u2h_optim produces H_ij, but produced H_ji (line 51)
     imgs = []
     for i in range(1, 8):
         imgs.append(mpimg.imread(f"data/bridge_0{i}.jpg"))
@@ -144,7 +144,7 @@ if __name__ == "__main__":
     x0 = exif_w / 2
     y0 = exif_h / 2
 
-    scale = 0.5
+    scale = 0.7
     K = np.array([[fx, 0, x0],
                   [0, fy, y0],
                   [0,  0,  1]])
