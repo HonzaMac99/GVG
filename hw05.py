@@ -63,8 +63,8 @@ def u2H(u, u0):
 def u2h_optim(u, u0):
     n_crp = u.shape[1]
     e_best = np.inf
-    H_best = np.zeros((3, 3))
-    points_sel = np.array([])
+    H_best = None
+    points_sel = None
     for inx in itertools.combinations(range(0, n_crp), 4):
         H = u2H(u[:, inx], u0[:, inx])
         u_proj = p2e(H @ e2p(u))

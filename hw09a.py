@@ -8,37 +8,8 @@ import scipy.io as sio            # for matlab file format output
 import itertools                  # for generating all combinations
 from PIL import Image
 
-
-def get_line_boundaries(plot_line, img):
-    plot_line = plot_line.reshape(1, 3)
-    min_x = 1
-    min_y = 1
-    max_x = img.shape[1]-1
-    max_y = img.shape[0]-1
-
-    boundaries = np.array([[min_x, min_x, max_x, max_x],
-                           [min_y, max_y, max_y, min_y]])
-    boundaries_hom = e2p(boundaries)
-
-    # get line vectors of the boundaries
-    a_line = np.cross(boundaries_hom[:, 0], boundaries_hom[:, 1])
-    b_line = np.cross(boundaries_hom[:, 1], boundaries_hom[:, 2])
-    c_line = np.cross(boundaries_hom[:, 2], boundaries_hom[:, 3])
-    d_line = np.cross(boundaries_hom[:, 3], boundaries_hom[:, 0])
-    bnd_lines = [a_line, b_line, c_line, d_line]
-
-    line_boundaries = np.zeros([2, 2])
-    count = 0
-    for bnd_line in bnd_lines:
-        line_end = p2e((np.cross(plot_line, bnd_line).reshape(3, 1)))
-        x = line_end[0]
-        y = line_end[1]
-        # plt.plot(x, y, "oy")
-        if 1 <= int(x) <= max_x and 1 <= int(y) <= max_y and count < 2:
-            line_end = np.reshape(line_end, (1, 2))
-            line_boundaries[:, count] = line_end
-            count += 1
-    return line_boundaries
+from hw08 import u2F
+from plot import *
 
 
 def e2p(u):
@@ -66,68 +37,107 @@ def cross(a, b):
     return np.vstack(np.cross(a.flatten(), b.flatten()))
 
 
+def get_from_dict(dict, ps):
+    return [dict[p] for p in ps]
+
+
+def compute_errs(u1, u2, F):
+    l1 = F.T @ e2p(u2)
+    l2 = F @ e2p(u1)
+
+    # compute distances from lines for both imgs
+    d1 = np.abs(np.sum(l1*e2p(u1), axis=0) / np.sqrt(l1[0]**2 + l1[1]**2))
+    d2 = np.abs(np.sum(l2*e2p(u2), axis=0) / np.sqrt(l2[0]**2 + l2[1]**2))
+
+    ep_errors = [d1, d2]
+    return ep_errors
+
+
+def get_best_Fe(u1, u2, ix):
+    Fe_best = np.zeros((3, 3))
+    e_max_best = np.inf
+    err_matches = []
+    points_sel = None
+    iter = itertools.combinations(range(0, 12), 7)  # every 7 pts of 10 pts
+    for inx in iter:
+        ix_sel = ix[np.array(inx)]
+        u1_sel = u1[:, ix_sel]
+        u2_sel = u2[:, ix_sel]
+
+        FF = u2F(u1_sel, u2_sel)
+        for F in FF:
+            if np.iscomplex(F).any() or np.linalg.matrix_rank(F) != 2:
+                continue
+            F = np.real(F)
+
+            # change F --> Fe so that we work with corrected E
+            E = K.T @ F @ K
+            [U, S, Vt] = np.linalg.svd(E)
+            D = np.array([[1, 0, 0],
+                          [0, 1, 0],
+                          [0, 0, 0]])
+            K_inv = np.linalg.inv(K)
+            Ex = U @ D @ Vt
+            Fe = K_inv.T @ Ex @ K_inv
+
+            # compute distances from lines for both imgs
+            [d1, d2] = compute_errs(u1, u2, Fe)
+
+            ep_errors = d1 + d2
+            e_max = np.max(ep_errors)
+
+            if e_max < e_max_best:
+                print("New best e:", e_max)
+                e_max_best = e_max
+                Fe_best = Fe
+                points_sel = ix_sel
+                err_matches = [d1, d2]
+
+    return Fe_best, err_matches, points_sel
+
+
 if __name__ == "__main__":
     img1 = mpimg.imread("data/daliborka_01.jpg")
     img2 = mpimg.imread("data/daliborka_23.jpg")
-    data = sio.loadmat("data/daliborka_01_23-uu.mat")
-    K = np.array(sio.loadmat("data/K.mat"))
+    data_hw8 = sio.loadmat("data/08_data.mat")
 
-    ix = data['ix'].flatten() - 1
-    # crp_idx = data['edges'][:, ix]
-    u1 = data['u01']
-    u2 = data['u23']
-    n_points = u2.shape[1]
+    [u1, u2, points_sel, ix, F] = get_from_dict(data_hw8, ('u1', 'u2', 'point_sel', 'ix', 'F'))
+    K = np.array(sio.loadmat("data/K.mat")["K"])
 
-    F, errs, points_sel = get_best_F(u1, u2, ix)
-    plt.figure()
-    plt.plot(np.arange(n_points), errs[0], "b-", label="image 1")
-    plt.plot(np.arange(n_points), errs[1], "g-", label="image 2")
-    plt.title("Epipolar error for all points")
-    plt.xlabel("point index")
-    plt.ylabel("epipolar error [px]")
-    plt.legend()
-    # plt.legend(loc="upper right")
-    plt.savefig("08_errors.pdf")
-    plt.show()
-    plt.close()
+    # === step 1 ===
+    E1 = K.T @ F @ K
+    [U, S, Vt] = np.linalg.svd(E1)
+    D = np.array([[1, 0, 0],
+                  [0, 1, 0],
+                  [0, 0, 0]])
+    K_inv = np.linalg.inv(K)
+    Ex = U @ D @ Vt
+    Fx = K_inv.T @ Ex @ K_inv
 
-    # plot the epipolar lines
-    fig, (ax1, ax2) = plt.subplots(1, 2)
-    ax1.imshow(img1)
-    ax2.imshow(img2)
-    fig.suptitle("The epipolar lines", y=0.85, fontsize=14, fontweight="bold")
+    errs = compute_errs(u1, u2, Fx)
+    ix = ix.flatten()
 
-    colors = ["darkred", "chocolate", "red", "gold", "darkolivegreen", "lime",
-              "steelblue", "royalblue", "navy", "indigo", "orchid", "crimson"]
-    for i in range(12):
-        u1_sel = u1[:, ix[i]].reshape(2, 1)
-        u2_sel = u2[:, ix[i]].reshape(2, 1)
+    # === steps 2-3 ===
+    plot_ep_lines(img1, img2, u1, u2, ix, Fx, "09_egx.pdf")
+    plot_ep_errors(errs, "09_errorsx.pdf")
 
-        l1 = F.T @ e2p(u2_sel)
-        l2 = F @ e2p(u1_sel)
-        l1_b = get_line_boundaries(l1, img1)
-        l2_b = get_line_boundaries(l2, img2)
+    # === step 4 ===
+    # compute F with the E constraint
+    Fe, errs, points_sel_e = get_best_Fe(u1, u2, ix)
+    E = K.T @ Fe @ K
 
-        ax1.scatter(u1_sel[0], u1_sel[1], marker='o', s=10.0, c=colors[i])
-        ax1.plot(l1_b[0], l1_b[1], color=colors[i])
-        ax1.set_title("Image 1")
+    # === steps 5-6 ===
+    plot_ep_lines(img1, img2, u1, u2, ix, Fe, "09_eg.pdf")
+    plot_ep_errors(errs, "09_errors.pdf")
 
-        ax2.scatter(u2_sel[0], u2_sel[1], marker='o', s=10.0, c=colors[i])
-        ax2.plot(l2_b[0], l2_b[1], color=colors[i])
-        ax2.set_title("Image 2")
-
-    plt.savefig("08_eg.pdf")
-    plt.show()
-
+    # === step 7 ===
     sio.savemat('09a_data.mat', {
-        'Fe': ...,
-        'E': ...,
-        'R': ...,
-        'C': ...,
-        'P1': ...,
-        'P2': ...,
-        'X': ...,
-        'u1': ...,
-        'u2': ...,
-        'point_sel_e': points_sel,
+        'F': F,
+        'Ex': Ex,
+        'Fx': Fx,
+        'E': E,
+        'Fe': Fe,
+        'u1': u1,
+        'u2': u2,
+        'point_sel_e': points_sel_e,
     })
