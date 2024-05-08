@@ -2,6 +2,46 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 
+def plot_rp_errors(errs, name="09_errorsr.pdf"):
+    n_points = max(errs[0].shape)
+    plt.figure()
+
+    plt.plot(np.arange(n_points), errs[0], "b-", label="image 1")
+    plt.plot(np.arange(n_points), errs[1], "g-", label="image 2")
+    plt.title("Reprojection error for all points")
+    plt.xlabel("point index")
+    plt.ylabel("reprojection error [px]")
+    plt.legend()
+    plt.savefig(name)
+    plt.show()
+    plt.close()
+
+
+def plot_reprojections(img1, img2, u1, u2, u1_proj, u2_proj, edges):
+    fig, (ax1, ax2) = plt.subplots(1, 2)
+    ax1.imshow(img1)
+    ax2.imshow(img2)
+    fig.suptitle("The reprojections", y=0.85, fontsize=14, fontweight="bold")
+
+    # plot the edges on bottom
+    for i in range(edges.shape[1]):
+        e = edges[:, i]
+        ax1.plot([u1[0, e[0]], u1[0, e[1]]], [u1[1, e[0]], u1[1, e[1]]], "y-")
+        ax2.plot([u2[0, e[0]], u2[0, e[1]]], [u2[1, e[0]], u2[1, e[1]]], "y-")
+
+    # note: use zorder to put the scatter on top
+    ax1.set_title("Image 1")
+    ax1.plot(u1[0], u1[1], "bo", markersize=2)
+    ax1.scatter(u1_proj[0], u1_proj[1], marker="o", facecolors="none", edgecolors="r", zorder=2)
+
+    ax2.set_title("Image 2")
+    ax2.plot(u2[0], u2[1], "bo", markersize=2)
+    ax2.scatter(u2_proj[0], u2_proj[1], marker="o", facecolors="none", edgecolors="r", zorder=2)
+
+    plt.savefig("09_reprojection.pdf")
+    plt.show()
+
+
 def plot_ep_errors(errs, name="some_ep_errors.pdf"):
     n_points = max(errs[0].shape)
     plt.figure()

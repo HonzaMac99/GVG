@@ -56,6 +56,7 @@ def E2RC(u1, u2, E):
     # second approach
     E_stripe = E / C_norm                   # E_str = R @ [t]x
     [U, S, Vt] = np.linalg.svd(E_stripe)    # (R @ [t]x) * t = 0
+
     v2 = Vt[-1, :]
     v2 = v2 / np.linalg.norm(v2)
     print("v from second approach: ", v2)
@@ -67,15 +68,24 @@ def E2RC(u1, u2, E):
 
     g1, g2, g3 = E_stripe.T
     v1, v2, v3 = V.T
-    Rs = []
-    for s in [1, -1]:
+    Rs = np.empty(2, dtype=object)
+    for i, s in enumerate([1, -1]):
+        # first approach (eq. 12.63) --> we get R, that is not orthonormal (R.T@R != 0 and det(R) != 1)!
         A = np.c_[s*g1, s*g2, s*g3, np.cross(g1, g2), np.cross(g2, g3), np.cross(g3, g1)]
         B = np.c_[  v1,   v2,   v3, np.cross(v1, v2), np.cross(v2, v3), np.cross(v3, v1)]
 
         # A = R@B --> B.T@R.T = A.T
         R = (np.linalg.lstsq(B.T, A.T, rcond=None)[0]).T
         # R = np.linalg.solve(B.T, A.T).T  # only for square matrices
-        Rs.append(R)
+        # Rs[i] = R
+
+        # second approach (eq. 12.103)
+        alpha = s
+        W = np.array([[0, alpha, 0],
+                      [-alpha, 0, 0],
+                      [0, 0, 1]])
+        R = U@W@Vt
+        Rs[i] = R
 
     R_best = np.zeros((3, 3))
     t_best = np.zeros((3, 1))
@@ -84,16 +94,17 @@ def E2RC(u1, u2, E):
     pts_front_best = 0
     for R in Rs:
         for s2 in [1, -1]:
-            t = s2*v
+            t = -s2*v
             P2 = R @ np.c_[I, -t]
             X = triangulate(u1, u2, P1, P2)
-            pts_front = np.sum(X[2] > 0)
-            print(f"got {pts_front}/{u1.shape[1]} points in front of both cameras")
+            u1_proj = P1@e2p(X)
+            u2_proj = P2@e2p(X)
+            pts_front = np.sum((u1_proj[2] > 0) * (u2_proj[2] > 0))
             if pts_front > pts_front_best:
-                # print(f"got {pts_front}/{u1.shape[1]} points in front of both cameras")
+                print(f"got {pts_front}/{u1.shape[1]} points in front of both cameras")
                 pts_front_best = pts_front
                 R_best = R
-                t_best = t
+                t_best = np.c_[t]
     C_best = t_best * C_norm
 
     return R_best, C_best
@@ -107,23 +118,24 @@ def triangulate(u1, u2, P1, P2):
         u1_i = e2p(np.c_[u1[:, i]])
         u2_i = e2p(np.c_[u2[:, i]])
 
-        # first approach
+        # first approach (eq. 12.69) - gives wrong results
         A = np.r_[np.c_[u1_i,    o, -P1],
                   np.c_[   o, u2_i, -P2]]
 
         [U, S, Vt] = np.linalg.svd(A)
-        Xi = Vt[-1, 2:] / Vt[-1, 5]       # last V column: [l1, l2, x1, x2, x3, x4]
-        X[:, i] = Xi[:3]
+        Xi = Vt[-1, 2:5] / Vt[-1, 5]       # last V column: [lambda1, lambda2, x1, x2, x3, x4]
 
         # second approach
-        # still precise, but less points in front of camera
-        A = np.r_[[P1[2,:]*u1_i[0]-P1[0,:]],
-                  [P1[2,:]*u1_i[1]-P1[1,:]],
-                  [P2[2,:]*u2_i[0]-P2[0,:]],
-                  [P2[2,:]*u2_i[1]-P2[1,:]]]
+        # better reprj. error, but less points in front of camera
+        A = np.r_[[P1[2,:]*u1_i[0] - P1[0,:]],
+                  [P1[2,:]*u1_i[1] - P1[1,:]],
+                  [P2[2,:]*u2_i[0] - P2[0,:]],
+                  [P2[2,:]*u2_i[1] - P2[1,:]]]
         [U, S, Vt2] = np.linalg.svd(A)
-        Xi2 = Vt2[-1,:] / Vt2[-1, 3]
-        # X[:, i] = Xi2[:3]
+        Xi2 = Vt2[-1, :3] / Vt2[-1, 3]
+
+        # X[:, i] = Xi
+        X[:, i] = Xi2
 
     return X
 
@@ -131,36 +143,58 @@ def triangulate(u1, u2, P1, P2):
 if __name__ == "__main__":
     img1 = mpimg.imread("data/daliborka_01.jpg")
     img2 = mpimg.imread("data/daliborka_23.jpg")
+    edges = sio.loadmat("data/daliborka_01_23-uu.mat")['edges'] - 1   # convert matlab indexing format
     data_hw9a = sio.loadmat("data/09a_data.mat")
 
     [u1, u2, points_sel, Fe, E] = get_from_dict(data_hw9a, ('u1', 'u2', 'point_sel_e', 'Fe', 'E'))
     K = np.array(sio.loadmat("data/K.mat")["K"])
 
+    # === step 1 ===
     R, C = E2RC(u1, u2, E)
 
+    # === step 2 ===
     P1 = K @ np.eye(3, 4)
     P2 = K @ np.hstack([R, -R @ np.c_[C]])
 
+    # === step 3 ===
     X = triangulate(u1, u2, P1, P2)
 
+    # === step 4 ===
     u1_proj = p2e(P1 @ e2p(X))
     u2_proj = p2e(P2 @ e2p(X))
+    plot_reprojections(img1, img2, u1, u2, u1_proj, u2_proj, edges)
 
-    fig, (ax1, ax2) = plt.subplots(1, 2)
-    ax1.imshow(img1)
-    ax2.imshow(img2)
-    fig.suptitle("The reprojections", y=0.85, fontsize=14, fontweight="bold")
+    # === step 5 ===
+    d1 = np.linalg.norm(u1 - u1_proj, axis=0)
+    d2 = np.linalg.norm(u2 - u2_proj, axis=0)
+    n_points = u1.shape[1]
 
-    ax1.set_title("Image 1")
-    ax1.scatter(u1[0], u1[1], marker="o", c="b")
-    ax1.scatter(u1_proj[0], u1_proj[1], marker="o", c="r")
+    plot_rp_errors([d1, d2], "09_errorsr.pdf")
 
-    ax2.set_title("Image 2")
-    ax2.scatter(u2[0], u2[1], marker="o", c="b")
-    ax2.scatter(u2_proj[0], u2_proj[1], marker="o", c="r")
+    # === step 6 ===
+    fig = plt.figure()
+    ax = plt.axes(projection='3d')
+
+    ax.set_xlim([-1.5, 1.5])
+    ax.set_ylim([-1.5, 1.5])
+    ax.set_zlim([-2.5, -0.5])
+    ax.view_init(elev=90, azim=-90, roll=0)
+    # ax.axis("off")
+
+    ax.scatter(X[0], X[1], X[2], marker="o", s=2, color="b")
+    ax.scatter(C[0], C[1], C[2], marker="o", s=5, color="r")
+    ax.text(C[0, 0], C[1, 0], C[2, 0], "Camera", c="r", fontsize=6)
+
+    # plot the edges on bottom
+    for i in range(edges.shape[1]):
+        e = edges[:, i]
+        x1, y1, z1 = X[:, e[0]]
+        x2, y2, z2 = X[:, e[1]]
+        ax.plot([x1, x2], [y1, y2], [z1, z2], "-", color="royalblue", zorder=-1)
 
     plt.show()
 
+    # === step 7 ===
     sio.savemat('09b_data.mat', {
         'Fe': Fe,
         'E': E,
