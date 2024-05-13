@@ -81,9 +81,9 @@ def E2RC(u1, u2, E):
 
         # second approach (eq. 12.103)
         alpha = s
-        W = np.array([[0, alpha, 0],
-                      [-alpha, 0, 0],
-                      [0, 0, 1]])
+        W = np.array([[     0, alpha, 0],
+                      [-alpha,     0, 0],
+                      [     0,     0, 1]])
         R = U@W@Vt
         Rs[i] = R
 
@@ -178,7 +178,7 @@ if __name__ == "__main__":
     ax.set_xlim([-1.5, 1.5])
     ax.set_ylim([-1.5, 1.5])
     ax.set_zlim([-2.5, -0.5])
-    ax.view_init(elev=90, azim=-90, roll=0)
+    # ax.view_init(elev=90, azim=-90, roll=0)
     # ax.axis("off")
 
     ax.scatter(X[0], X[1], X[2], marker="o", s=2, color="b")
@@ -204,6 +204,6 @@ if __name__ == "__main__":
         'P2': P2,
         'X': X,
         'u1': u1,
-        'u2': u1,
+        'u2': u2,
         'point_sel_e': points_sel,
     })
